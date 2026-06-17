@@ -1,40 +1,16 @@
-# Transit Privilege Writeup
+# Transit Privilege
 
-## Overview
+## Description
 
-This challenge is split into two parts.  
+A certain operations console is used to manage edge nodes, maintenance tasks, and diagnostic reports. So, what's the problem with the analysis**?**
 
-At the beginning, the player does not have the server source code. The only attachment is a client JAR, `edge-agent-client-0.1.0.jar`. That JAR exposes the `/proxy` protocol, so the first half of the challenge is about recovering the protocol and turning it into a usable foothold.  
+## Author
 
-After that, the route to the flag is not a direct admin endpoint. The player has to use the workspace workflow to become `ADMIN`, then use the backup feature to obtain the server JAR, and only then analyze the deserialization and file-read chain in the second half.
+lhRaMk7
 
-The intended path is:
+## solutions
 
-```text
-analyze the player JAR
--> recover the /proxy WebSocket protocol
--> finish cap.sync and create an OPERATOR account
--> log into the console
--> use the workspace flow to become ADMIN
--> download the server JAR from the backup feature
--> analyze the maintenance import chain
--> abuse the char -> byte truncation issue
--> read /flag
-```
-
-What makes the challenge interesting is not any single step on its own, but the way these steps have to be connected.
-
----
-
-## 1. The real entry point is not the login page
-
-The public web page looks like a normal login portal. At first glance, the only obvious endpoints are things like:
-
-- `/login`
-- `/admin/me`
-- `/api/status`
-
-The status response is intentionally plain:
+When this challenge is first opened, the web side does not give away much. It looks like an ordinary login page, and the few visible endpoints such as `/login`, `/admin/me`, and `/api/status` do not immediately expose a useful route. Even `/api/status` is intentionally plain:
 
 ```json
 {
@@ -45,51 +21,21 @@ The status response is intentionally plain:
 }
 ```
 
-That is not enough to move very far. The useful starting point is the attachment JAR.
-
-After reversing the client, it becomes clear that it does not speak to a normal REST backend first. It upgrades the target into:
-
-```text
-ws://host/proxy
-```
-
-So the first meaningful surface is:
-
-```text
-/proxy
-```
-
-The client flow is also visible there:
-
-```text
-HELLO -> AUTH -> DESCRIBE -> CALL
-```
-
-The signing material is hardcoded as well, including the fixed key string:
+So the real starting point is not the page itself but the attachment. The provided file is `edge-agent-client-0.1.0.jar`, and after reversing it, it becomes clear that the client is not talking to an ordinary REST entry first. It upgrades the target into `ws://host/proxy`, and the protocol flow is easy to follow from the code: `HELLO -> AUTH -> DESCRIBE -> CALL`. The signing material is there as well, including the fixed key string:
 
 ```text
 6Ziy5ZCb5a2Q5LiN5aao5bCP5Lq6ISEh
 ```
 
-At this point, the challenge stops being “guess the web app” and turns into “rebuild the client protocol.”
+as well as the canonical formats used for `AUTH` and `CALL`. At that point the first half of the challenge stops being “find a hidden web endpoint” and becomes “rebuild the client protocol.”
 
----
-
-## 2. Why `cap.sync` stands out
-
-Once `HELLO` and `AUTH` are working, the next step is to inspect the capability scope with `DESCRIBE`.  
-
-Among the returned operations, `cap.sync` is the one that deserves attention. It is clearly not a one-shot helper call. It is a negotiated flow with a ticket and a proof stage, which usually means it has some persistent side effect.
-
-The field names are already suggestive:
+Once `HELLO` and `AUTH` are working, `DESCRIBE` is the next thing worth looking at. The operation that stands out immediately is `cap.sync`. It is not a one-shot helper call. It is a negotiated flow with a ticket and a proof stage, so it is the kind of thing that often has a persistent side effect. At first the field names alone are only suggestive:
 
 - `identity`
 - `principal`
 - `secret`
 
-But the stronger hint comes from live interaction rather than from names alone.
-
-If `secret` is intentionally weak, the server rejects it with a password-style validation message:
+but the live behavior is much more informative than the names. If `secret` is intentionally weak, the server replies with a password-style validation error:
 
 ```json
 {
@@ -101,13 +47,9 @@ If `secret` is intentionally weak, the server rejects it with a password-style v
 }
 ```
 
-That is not the kind of response you would expect from a harmless configuration field. It is much more consistent with a login credential. Together with `principal`, it points toward account creation or credential binding.
+That is the point where the route becomes much clearer. This does not look like an arbitrary configuration field anymore. It looks like a credential. Together with `principal`, it strongly suggests account creation or at least some form of console identity binding.
 
----
-
-## 3. Turning `cap.sync` into a console account
-
-The first `HELLO` response looks like this:
+The flow itself is straightforward once the protocol is understood. First a `HELLO` packet is sent to `/proxy`, and the server answers with:
 
 ```json
 {
@@ -120,13 +62,7 @@ The first `HELLO` response looks like this:
 }
 ```
 
-The values that matter afterward are:
-
-- `nonce`
-- `profile`
-- `routeEpoch`
-
-After `AUTH`, querying `edge.capability` reveals `cap.sync`:
+The important values are `nonce`, `profile`, and `routeEpoch`. After `AUTH`, querying `edge.capability` reveals:
 
 ```json
 {
@@ -166,14 +102,7 @@ does not complete the process immediately. The server responds with:
 }
 ```
 
-That reply is enough to understand the rest of the flow:
-
-- the request is accepted so far,
-- the server issues a `ticket`,
-- a second step with `proof` is required,
-- the flow continues under `edge.capability.ticket`.
-
-After computing the proof exactly as the client does and submitting the second-stage request, the server returns:
+This reply already explains the rest of the route. The request is accepted so far, a `ticket` is issued, and the flow must continue under `edge.capability.ticket` with an additional `proof`. After computing the proof exactly as the client does and sending the second-stage request, the server returns:
 
 ```json
 {
@@ -187,25 +116,21 @@ After computing the proof exactly as the client does and submitting the second-s
 }
 ```
 
-The important field here is:
+The most important part is:
 
 ```json
 "scope": "operator-console"
 ```
 
-This is the point where the earlier guess becomes easy to verify: the returned `principal/secret` pair can now be used to log into the web console, and the resulting role is `OPERATOR`.
+That makes the earlier suspicion easy to verify. The returned `principal/secret` pair can now be used to log into the web console, and the role is `OPERATOR`.
 
----
-
-## 4. The privilege escalation is hidden inside workspace
-
-After logging in, the application still does not expose an obvious “become admin” route. The useful surface is:
+After logging in, the application still does not expose an obvious admin function. The more useful surface is the workspace bootstrap:
 
 ```text
 GET /api/workspace/bootstrap
 ```
 
-This returns a per-session set of action IDs, for example:
+which returns a set of session-specific action IDs such as:
 
 ```json
 {
@@ -218,13 +143,13 @@ This returns a per-session set of action IDs, for example:
 }
 ```
 
-This makes it clear that the workflow is exposed through a facade:
+This shows that the workflow is exposed through a facade:
 
 ```text
 POST /api/workspace/action
 ```
 
-The first draft request does not go straight into an approval queue. Instead, it returns:
+Starting a draft does not immediately create a completed request. Instead, the server replies with:
 
 ```json
 {
@@ -234,9 +159,7 @@ The first draft request does not go straight into an approval queue. Instead, it
 }
 ```
 
-So the next question is obvious: who decides the reviewer and the lane?
-
-The preview step provides enough hints to keep following that path:
+so the next question becomes obvious: who decides the reviewer and the lane? The preview step gives enough hints to keep following that direction:
 
 ```json
 {
@@ -251,16 +174,9 @@ The preview step provides enough hints to keep following that path:
 }
 ```
 
-Even without the source code, the interesting words are already there:
+Even before seeing the source code, the important words are already there: `policyRef`, `routing`, `handoff`, and `retained`. At that point the natural idea is simple: if the reviewer is decided here, can the routing metadata be pushed back toward the request owner?
 
-- `policyRef`
-- `routing`
-- `handoff`
-- `retained`
-
-That is enough to start testing whether the routing metadata can be used to make the request come back to the owner.
-
-The intended payload is:
+The payload that actually works is:
 
 ```json
 {
@@ -273,7 +189,7 @@ The intended payload is:
 }
 ```
 
-After submitting it, the request lands in the `retain` lane. Pushing it forward with `advanceActionId` and setting the state to `APPROVED` upgrades the account. A later call to `/admin/me` returns:
+After submitting it, the request lands in the `retain` lane. Advancing it to `APPROVED` and then checking `/admin/me` gives:
 
 ```json
 {
@@ -282,17 +198,15 @@ After submitting it, the request lands in the `retain` lane. Pushing it forward 
 }
 ```
 
-At that point, the first half of the challenge is done.
+So the first half is complete at that point. The remaining job is to find the final read path.
 
----
+Once `ADMIN` is available, the most useful next step is not blind endpoint enumeration. It is to look for places where the application reveals more of its own internals. In this challenge, that transition from black-box to white-box is intentionally placed in the backup feature. Querying:
 
-## 5. The backup feature is the intended transition to white-box analysis
+```text
+GET /api/backup/list
+```
 
-Once `ADMIN` is reached, the most valuable next step is not blind endpoint hunting. It is to check whether the application itself exposes more implementation detail.
-
-The backup feature does exactly that.
-
-Listing available bundles reveals:
+reveals a very telling record:
 
 ```json
 [
@@ -305,45 +219,21 @@ Listing available bundles reveals:
 ]
 ```
 
-That response is already explicit:
-
-- the profile is `server-source`,
-- the note states that it contains the packaged service JAR.
-
-After creating a ticket and fetching the bundle, the archive contains:
+That is already explicit enough: the profile is `server-source`, and the note says that the bundle contains the packaged service JAR. After creating a ticket and fetching the bundle, the archive contains:
 
 ```text
 ops-console-demo-0.1.0.jar
 ```
 
-Only now does the challenge become a proper white-box problem.
+Only from this point onward does the second half become a source-level problem.
 
----
-
-## 6. What the server code confirms
-
-With the server JAR in hand, the second half becomes much easier to map out.
-
-The first useful keywords are:
-
-- `reconcile`
-- `ObjectInputStream`
-- `readObject`
-
-They quickly lead to:
+With the server JAR available, searching for terms like `reconcile`, `ObjectInputStream`, and `readObject` quickly leads to:
 
 ```text
 /admin/maintenance/reconcile
 ```
 
-This route accepts a Base64-encoded ZIP, extracts:
-
-- `manifest.json`
-- `inventory.dat`
-
-and then deserializes `inventory.dat` with Java native deserialization.
-
-The most useful class on that path is:
+This route accepts a Base64-encoded ZIP, extracts `manifest.json` and `inventory.dat`, and then deserializes `inventory.dat` with Java native deserialization. The most important class on this path is:
 
 ```text
 ctf.sctf.ops.maintenance.InventoryCursorEntry
@@ -355,20 +245,27 @@ Its `readObject()` method calls:
 ProbeSandbox.renderSnapshot(name, profile, cursor)
 ```
 
-and the output is later written into the maintenance report.
+and the output of that call is later written into the maintenance report. That makes it the ideal entry for the final stage, because deserialization immediately reaches useful logic and the result can still be recovered afterward.
 
-That makes it ideal for the final stage:
+Looking further into `ops-console-demo-0.1.0.jar`, the actual issue becomes much easier to describe. Once `InventoryCursorEntry.readObject()` passes `cursor` and `profile` onward, `renderSnapshot()` reaches the following chain when `profile=merge`:
 
-1. deserialization triggers behavior immediately,
-2. the output can be recovered from the report endpoint.
+```text
+BridgeIndexRenderer.renderProfile(...)
+-> LegacyCursorAdapter.flattenToken(cursor)
+-> IndexSnapshotStore.readSegment(storageToken)
+```
 
----
+The critical part is `LegacyCursorAdapter.flattenToken()`. It does not directly use the original `cursor`. Instead, it iterates over every character and calls:
 
-## 7. The bug is a mismatch between what is filtered and what is used
+```java
+private static byte bridgeOctet(char codeUnit) {
+    return (byte) codeUnit;
+}
+```
 
-Inside `ProbeSandbox`, the `merge` profile eventually sends `cursor` into the file-backed path.
+In other words, every Java `char` is truncated into a single `byte`, and only the low 8 bits are kept. `flattenToken()` then rebuilds a new string from those bytes with `ISO_8859_1`. At that moment, the string inspected by the filter and the string actually used for path resolution are no longer the same object in any meaningful sense.
 
-At first glance, the filtering logic looks as if it is blocking traversal markers such as:
+The filter itself appears to block obvious traversal markers such as:
 
 - `../`
 - `./`
@@ -376,20 +273,13 @@ At first glance, the filtering logic looks as if it is blocking traversal marker
 - `..%2f`
 - `%u002e`
 
-The real issue is not that the blacklist is incomplete in a trivial way. The real issue is that the string being checked is not the same string that is later used for path resolution.
+but it only checks the original visible string. If a Unicode character does not visibly look like `.` or `/`, yet its low byte becomes `.` or `/`, the visible check passes while the later materialized string becomes a real traversal path.
 
-In the middle of the process, each Java `char` is truncated into a single `byte`. That creates a representation gap:
-
-- the filter looks at the visible Unicode string,
-- the path logic later works on the low-byte materialized form.
-
-As a result, a character that does not visibly look like `.` or `/` can still become `.` or `/` after truncation if its low byte matches.
-
-For example:
+That is exactly what happens here. For example:
 
 - `售` becomes `.`
 - `启` becomes `/`
-- `书`, `公`, `卡`, `剧` can become `f`, `l`, `a`, `g`
+- `书`, `公`, `卡`, and `剧` can become `f`, `l`, `a`, and `g`
 
 So the visible string:
 
@@ -397,7 +287,7 @@ So the visible string:
 售售启售售启售售启书公卡剧
 ```
 
-materializes into:
+is later materialized into:
 
 ```text
 ../../../flag
@@ -409,40 +299,22 @@ After `resolve().normalize()`, the final target becomes:
 /flag
 ```
 
----
+From there, the remaining work is direct. A crafted `InventoryCursorEntry` is placed into `inventory.dat`, a valid `manifest.json` is included, the ZIP is Base64-encoded and submitted to:
 
-## 8. Getting the flag back from the report
+```text
+POST /admin/maintenance/reconcile
+```
 
-At that point, the remaining work is straightforward:
-
-- build an `InventoryCursorEntry`,
-- place it into `inventory.dat`,
-- include a valid `manifest.json`,
-- submit the bundle to `/admin/maintenance/reconcile`.
-
-The server returns an `importId`.  
-
-Querying:
+The server returns an `importId`, and querying:
 
 ```text
 GET /admin/maintenance/reports?importId=<importId>
 ```
 
-returns the final output, which includes:
+returns the final output. The recovered flag is:
 
 ```text
 SCTF{Tr4ns1t_Pr0b3_4107_M@sTer}
 ```
 
----
-
-## Final notes
-
-This challenge is built out of several half-hidden layers:
-
-- the first half is exposed through a client JAR rather than through obvious admin routes,
-- the privilege escalation is buried inside a workflow facade,
-- the source code is not given away at the start but becomes available through the backup feature,
-- the final file-read issue is not a plain traversal string but a representation mismatch.
-
-Taken separately, none of these steps is especially large. The real difficulty lies in noticing how they fit together.
+Looking back, none of the individual steps is especially large on its own. What makes the challenge work is the way the pieces are separated across different layers: the first half is exposed through a client JAR instead of obvious web routes, the privilege escalation is hidden inside a workspace facade, the source code is not given immediately but must be obtained through backup, and the final file-read issue is not a plain visible `../` but a mismatch between the visible representation and the string that is actually consumed later.
