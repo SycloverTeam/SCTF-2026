@@ -1,0 +1,7 @@
+services:
+  phpstilalive:
+    build: .
+    image: sctf2026/phpstilalive:latest
+    ports:
+      - "18080:80"
+    restart: unless-stopped

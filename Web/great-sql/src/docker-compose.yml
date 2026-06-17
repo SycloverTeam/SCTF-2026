@@ -1,0 +1,7 @@
+version: "3"
+services:
+  great-sql:
+    build: .
+    image: great-sql:latest
+    ports:
+      - "8080"

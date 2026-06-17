@@ -1,0 +1,42 @@
+model = "gpt-5"
+model_provider = "challenge"
+forced_login_method = "api"
+enable_codex_api_key_env = true
+approval_policy = "never"
+sandbox_mode = "read-only"
+disable_response_storage = true
+web_search = "disabled"
+tools_view_image = false
+
+[model_providers.challenge]
+name = "Contestant API"
+base_url = "http://127.0.0.1"
+wire_api = "responses"
+env_key = "CONTESTANT_API_KEY"
+supports_websockets = false
+stream_max_retries = 1
+request_max_retries = 1
+
+[features]
+apps = false
+multi_agent = false
+shell_snapshot = false
+shell_tool = false
+unified_exec = false
+apply_patch_streaming_events = false
+apply_patch_freeform = false
+
+[mcp_servers.sandbox]
+command = "python3"
+args = ["/app/sandbox_mcp.py"]
+startup_timeout_sec = 5
+tool_timeout_sec = 8
+required = true
+enabled_tools = ["sandbox_eval"]
+default_tools_approval_mode = "approve"
+
+[mcp_servers.sandbox.tools.sandbox_eval]
+approval_mode = "approve"
+
+[tools]
+view_image = false
