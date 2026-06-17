@@ -6,7 +6,6 @@ Where is sqlMaster?
 GSBP
 
 ## solutions
-这题的内容是来自于前段时间用Ai挖掘到的一个`Apache Calcite`的0day(还未公布)，然后出在了SCTF上，为了使题目没那么简单还额外加了传参的长度限制，但是似乎在agent解题的情况下也没加多少难度。
 
 漏洞原因是`jdbc:calcite:`下可以注入任意的inline属性，而inline属性可以支持将java方法注册进入sql方法。形成了一个UDF漏洞。预期解法使用了下面两个inline model来注册方法。
 ```java
