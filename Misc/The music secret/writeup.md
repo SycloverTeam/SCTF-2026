@@ -1,6 +1,15 @@
-# The music secret 官方题解
+# The music secret
 
-## 题目整体思路
+## Description
+
+The music platform discovered inconsistencies between the music in its edge cache and the studio archives, and conducted packet capture analysis.
+
+## Author
+
+lhRaMk7
+
+## solutions
+
 
 这题给的核心附件只有一个抓包文件：
 
