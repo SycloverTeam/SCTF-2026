@@ -1,6 +1,15 @@
-# The music secret Writeup
+# The music secret
 
-## Overview
+## Description
+
+The music platform discovered inconsistencies between the music in its edge cache and the studio archives, and conducted packet capture analysis.
+
+## Author
+
+lhRaMk7
+
+## solutions
+
 
 The only core attachment in this challenge is:
 
@@ -33,7 +42,7 @@ PCAPNG
 
 ---
 
-## 1. The capture already tells you how to approach it
+### 1. The capture already tells you how to approach it
 
 Opening `stream.pcapng` in Wireshark and filtering for HTTP quickly reveals several useful requests:
 
@@ -45,7 +54,7 @@ Opening `stream.pcapng` in Wireshark and filtering for HTTP quickly reveals seve
 
 The first two responses matter the most.
 
-### Incident response
+#### Incident response
 
 The incident record says:
 
@@ -66,7 +75,7 @@ This is more than flavor text. It directly explains the shape of the problem:
 3. some responses are truncated,
 4. later Range retries must be used to fill the gaps.
 
-### Playback session response
+#### Playback session response
 
 The playback metadata provides the next set of constraints:
 
@@ -106,7 +115,7 @@ At this point, several things are already fixed:
 
 ---
 
-## 2. The first job is rebuilding the WAV files
+### 2. The first job is rebuilding the WAV files
 
 The two important resources are:
 
@@ -160,7 +169,7 @@ That is important, because the later diffing only works if the samples are align
 
 ---
 
-## 3. The key comes from request order
+### 3. The key comes from request order
 
 The challenge does not hide the key in the audio. It tells you where it comes from:
 
@@ -220,7 +229,7 @@ That is a good checkpoint. If this value is wrong, there is no reason to trust a
 
 ---
 
-## 4. Why the symbol period is 2000 samples
+### 4. Why the symbol period is 2000 samples
 
 This step is not guesswork. The metadata already gives enough information:
 
@@ -254,7 +263,7 @@ The waveform differences later confirm the same number: the strong changes line 
 
 ---
 
-## 5. The real payload is in the difference between `studio` and `cache`
+### 5. The real payload is in the difference between `studio` and `cache`
 
 Neither audio track makes much sense on its own as a hiding place. The useful signal appears when the two WAV files are compared sample by sample.
 
@@ -282,7 +291,7 @@ This is the real turning point of the challenge. Once it is clear that the paylo
 
 ---
 
-## 6. Sync word, frame header, and ordering
+### 6. Sync word, frame header, and ordering
 
 The metadata already tells us three important things:
 
@@ -309,7 +318,7 @@ So this step is not about inventing a frame structure from scratch. It is about 
 
 ---
 
-## 7. Why Hamming and CRC16 matter
+### 7. Why Hamming and CRC16 matter
 
 The headers explicitly announce:
 
@@ -336,7 +345,7 @@ So CRC16 is not a decorative detail here. It is the final piece that locks the w
 
 ---
 
-## 8. Why the final output is base64
+### 8. Why the final output is base64
 
 After reconstruction, the result is still not the flag in clear text. The recovered bytes are XOR-obfuscated.
 
@@ -350,7 +359,7 @@ SCTF{stream_order_meets_noisy_rhythm}
 
 ---
 
-## Final notes
+### Final notes
 
 Although this is a Misc challenge, the hints are not sparse at all. The key is to not treat them as unrelated fragments:
 
