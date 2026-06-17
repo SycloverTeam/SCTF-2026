@@ -4,11 +4,11 @@
 
 A certain operations console is used to manage edge nodes, maintenance tasks, and diagnostic reports. So, what's the problem with the analysis?
 
-# Author
+## Author
 
 lhRaMk7
 
-# solutions
+## solutions
 
 这题刚拿到的时候，网页表面上其实没什么好看的，就是一个普通登录页。能摸到的接口也很少，像 `/login`、`/admin/me`、`/api/status` 这种，`/api/status` 回的东西也很普通：
 
