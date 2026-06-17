@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <p class="eyebrow">Authenticated Reader</p>
+  <h1>欢迎回来，{{ user["username"] }}</h1>
+  <p class="lede">你的权限允许查看存档中的内部文章。以下条目围绕无敌少侠、维特鲁姆帝国与地球防务署的关系展开。</p>
+  <ul class="meta-list">
+    <li>User ID: {{ user["id"] }}</li>
+    <li>Role: {{ user["role"] }}</li>
+    <li>Created at: {{ user["created_at"] }}</li>
+  </ul>
+  <div class="actions">
+    <a class="button" href="/api/me">查看当前身份</a>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>角色档案室</h2>
+  <div class="article-grid">
+    {% for item in articles %}
+    <article class="article-card">
+      <img class="character-image" src="{{ item['image'] }}" alt="{{ item['title'] }}" />
+      <span class="pill">{{ item["tag"] }}</span>
+      <h3>{{ item["title"] }}</h3>
+      <p class="muted">{{ item["subtitle"] }}</p>
+      <p>{{ item["body"] }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

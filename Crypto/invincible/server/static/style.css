@@ -1,0 +1,232 @@
+body {
+  margin: 0;
+  font-family: "Helvetica Neue", "Noto Sans SC", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(244, 63, 94, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 22%),
+    linear-gradient(180deg, #fff7ed 0%, #fff 45%, #f8fafc 100%);
+  color: #172033;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(90deg, #0f172a, #1d4ed8 55%, #dc2626);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+}
+
+.brand a,
+.topbar a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.brand a {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.topbar nav {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.inline {
+  display: inline;
+}
+
+.inline button {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.container {
+  max-width: 1080px;
+  margin: 2rem auto 4rem;
+  padding: 0 1rem;
+}
+
+.card,
+.panel {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 1.2rem;
+  padding: 1.5rem;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.hero {
+  padding: 2rem;
+}
+
+.panel {
+  margin-top: 1.4rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  color: #dc2626;
+  font-weight: 800;
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1, h2, h3 {
+  margin-top: 0;
+}
+
+.lede,
+.muted {
+  color: #475569;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+input {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.button,
+button[type="submit"] {
+  display: inline-block;
+  background: linear-gradient(90deg, #1d4ed8, #dc2626);
+  color: #fff;
+  text-decoration: none;
+  border: none;
+  border-radius: 999px;
+  padding: 0.8rem 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button.secondary {
+  background: linear-gradient(90deg, #0f172a, #334155);
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.success {
+  color: #047857;
+}
+
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.article-card {
+  padding: 1.1rem;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,245,249,0.95));
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.character-image {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 0.85rem;
+  margin-bottom: 0.9rem;
+  background: #e2e8f0;
+}
+
+.pill {
+  display: inline-block;
+  margin-bottom: 0.65rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.meta-list {
+  padding-left: 1.2rem;
+}
+
+.admin-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.78)),
+    url("/static/characters/thinkmarkthumbnail.PNG") center center / cover no-repeat;
+  color: #f8fafc;
+}
+
+.admin-hero .eyebrow,
+.admin-hero .success,
+.admin-hero code {
+  color: #fff;
+}
+
+.admin-hero code {
+  background: rgba(15, 23, 42, 0.35);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+}
+
+.admin-hero table {
+  background: rgba(255, 255, 255, 0.88);
+  color: #172033;
+  border-radius: 0.8rem;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .topbar nav {
+    flex-wrap: wrap;
+  }
+}

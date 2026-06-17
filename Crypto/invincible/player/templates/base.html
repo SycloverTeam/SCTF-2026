@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title if title else "Invincible Archive" }}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><a href="/">Invincible Archive</a></div>
+      <nav>
+        <a href="/">Home</a>
+        {% if user %}
+        <a href="/dashboard">Archive</a>
+        {% if user["role"] == "admin" %}
+        <a href="/admin">Console</a>
+        {% endif %}
+        <form action="/logout" method="post" class="inline">
+          <button type="submit">Logout</button>
+        </form>
+        {% else %}
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+        {% endif %}
+      </nav>
+    </header>
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

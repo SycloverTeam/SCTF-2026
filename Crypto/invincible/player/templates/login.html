@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <p class="eyebrow">Private Reader Access</p>
+  <h1>登录档案室</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form action="/login" method="post" class="stack">
+    <label>Username <input type="text" name="username" required /></label>
+    <label>Password <input type="password" name="password" required /></label>
+    <button type="submit">Login</button>
+  </form>
+</section>
+{% endblock %}

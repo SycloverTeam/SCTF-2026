@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card admin-hero">
+  <p class="eyebrow">Global Defense Agency</p>
+  <h1>管理员控制台</h1>
+  <p class="success">你已经进入内部指挥界面。</p>
+  <p>Flag: <code>{{ flag }}</code></p>
+  <h2>已登记观察对象</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Username</th><th>Role</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+      {% for entry in users %}
+      <tr>
+        <td>{{ entry["id"] }}</td>
+        <td>{{ entry["username"] }}</td>
+        <td>{{ entry["role"] }}</td>
+        <td>{{ entry["created_at"] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

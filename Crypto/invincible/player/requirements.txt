@@ -1,0 +1,6 @@
+cryptography
+fastapi
+jinja2
+pycryptodome
+python-multipart
+uvicorn

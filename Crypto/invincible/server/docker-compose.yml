@@ -1,0 +1,17 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: demo-fastapi-jwt:latest
+    ports:
+      - "8000:8000"
+    environment:
+      FLAG: "SCTF{t1hinK_mark1_You’ll outlast every fragile, insignificant being on this planet!}"
+      FLAG_ENV_FILE: "/app/server/data/flag.env"
+      DEMO_ADMIN_USERNAME: "admin"
+      DEMO_DB_PATH: "/app/server/data/app.db"
+      DEMO_JWT_KEY_FILE: "/app/server/data/jwt_signer_key.pem"
+    volumes:
+      - ./data:/app/server/data
+    restart: unless-stopped

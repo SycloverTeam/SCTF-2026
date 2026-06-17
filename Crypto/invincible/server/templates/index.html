@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero card">
+  <p class="eyebrow">Global Defense Archive</p>
+  <h1>无敌少侠事件记录库</h1>
+  <p class="lede">这里收录了关于马克、维特鲁姆人、地球防务署和校园生活交错时刻的内部文章。公开访客只能看到摘要，登录后才能阅读完整条目。</p>
+  {% if user %}
+  <div class="actions">
+    <a class="button" href="/dashboard">进入档案室</a>
+  </div>
+  {% else %}
+  <div class="actions">
+    <a class="button" href="/login">登录阅读</a>
+    <a class="button secondary" href="/register">注册账号</a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>角色档案</h2>
+  <div class="article-grid">
+    {% for item in featured %}
+    <article class="article-card">
+      <img class="character-image" src="{{ item['image'] }}" alt="{{ item['title'] }}" />
+      <span class="pill">{{ item["tag"] }}</span>
+      <h3>{{ item["title"] }}</h3>
+      <p class="muted">{{ item["subtitle"] }}</p>
+      <p>{{ item["body"] }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
