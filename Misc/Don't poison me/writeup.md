@@ -1,4 +1,8 @@
 ## Don't poison me
+## Description
+来来来，某大厂自研漏挖Agent来了，大家自己配置api就能挖到数不清的漏洞了
+
+Here it is—a vulnerability-scanning agent developed in-house by a major tech company. Just configure the API, and you’ll be able to find countless vulnerabilities.
 
 ## Author
 GSBP
