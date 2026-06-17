@@ -1,0 +1,32 @@
+{
+  "version": 30,
+  "seed": "0xa8b55eed20260527",
+  "flag_sha256": "079123533da41146f35292b96a41970c5f577cbcf0ce1be4d13592e964b47cd9",
+  "physical_stage_count": 172,
+  "phase_count": 4,
+  "xchar_packs": [
+    "0xf4d0ecb73f712fd5",
+    "0x7daf992f819ba1f3",
+    "0xf554b484d9924054",
+    "0x978a178d31899809",
+    "0xc0875d33f831cf4b",
+    "0x0000000000b4c13c"
+  ],
+  "layout_manifest_words": [
+    "0xbbb51a51e4a53129",
+    "0x818530f46a4666bc",
+    "0x1b5d817fa5f77005",
+    "0x4fa3edf78982bb46"
+  ],
+  "special_stage_counts": {
+    "rx": 4,
+    "memfd": 4,
+    "pvm": 3,
+    "island": 4,
+    "segv": 3,
+    "futex": 6,
+    "sigill": 6,
+    "heartbeat": 3,
+    "meta": 44
+  }
+}
