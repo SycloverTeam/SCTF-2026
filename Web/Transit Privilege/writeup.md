@@ -2,7 +2,7 @@
 
 ## Description
 
-A certain operations console is used to manage edge nodes, maintenance tasks, and diagnostic reports. So, what's the problem with the analysis**?**
+A certain operations console is used to manage edge nodes, maintenance tasks, and diagnostic reports. So, what's the problem with the analysis?
 
 # Author
 
