@@ -1,0 +1,23 @@
+[server]
+listen = "127.0.0.1:8080"
+request_timeout_ms = 30000
+max_concurrency = 16384
+
+[selector]
+refresh_interval_ms = 200
+
+[[routes]]
+name = "api"
+kind = "proxy"
+path_prefix = "/api"
+methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+upstreams = [
+  "http://127.0.0.1:3000",
+]
+
+[[routes]]
+name = "static"
+kind = "static"
+path_prefix = "/static"
+methods = ["GET", "HEAD"]
+root = "./public"

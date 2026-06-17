@@ -1,0 +1,16 @@
+[package]
+name = "vault"
+version = "0.1.0"
+edition = "2021"
+description = "Treasury reconciliation export service (axum v0.8.9)"
+publish = false
+
+[workspace]
+
+[dependencies]
+axum = "0.8.9"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

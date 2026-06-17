@@ -1,0 +1,7 @@
+.git
+.DS_Store
+__pycache__/
+target/
+gateway/target/
+vault/target/
+*.pyc

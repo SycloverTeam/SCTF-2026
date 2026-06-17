@@ -1,0 +1,17 @@
+[server]
+listen = "0.0.0.0:8080"
+request_timeout_ms = 10000
+max_concurrency = 2048
+
+[selector]
+snapshot_url = "http://127.0.0.1:3005/internal/compliance/export-snapshot"
+refresh_interval_ms = 1000
+
+[[routes]]
+name = "api"
+kind = "proxy"
+path_prefix = "/api"
+methods = ["GET", "POST"]
+upstreams = [
+  "http://127.0.0.1:3005",
+]
