@@ -1,0 +1,8 @@
+pyproject.toml
+app/bot.py
+app/main.py
+web_shop_backend.egg-info/PKG-INFO
+web_shop_backend.egg-info/SOURCES.txt
+web_shop_backend.egg-info/dependency_links.txt
+web_shop_backend.egg-info/requires.txt
+web_shop_backend.egg-info/top_level.txt

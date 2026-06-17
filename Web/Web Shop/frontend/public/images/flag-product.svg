@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#10192f"/>
+      <stop offset="0.55" stop-color="#4b2a69"/>
+      <stop offset="1" stop-color="#d99a2b"/>
+    </linearGradient>
+    <linearGradient id="flag" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffef9a"/>
+      <stop offset="0.5" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#49e5ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="800" height="520" rx="38" fill="url(#bg)"/>
+  <circle cx="650" cy="100" r="90" fill="#fff0a8" opacity=".22"/>
+  <circle cx="150" cy="420" r="130" fill="#4be0ff" opacity=".14"/>
+  <path d="M214 412V112" stroke="#fff2b8" stroke-width="26" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M238 115c96-54 160 48 257-7v166c-95 58-160-44-257 10z" fill="url(#flag)" stroke="#fff9d9" stroke-width="10" filter="url(#glow)"/>
+  <path d="M276 173h168M276 222h118" stroke="#18213a" stroke-width="18" stroke-linecap="round" opacity=".8"/>
+  <text x="400" y="426" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="72" font-weight="900" fill="#fff7dc" filter="url(#glow)">FLAG</text>
+  <text x="400" y="472" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#ffe6a0">999999 COINS</text>
+</svg>

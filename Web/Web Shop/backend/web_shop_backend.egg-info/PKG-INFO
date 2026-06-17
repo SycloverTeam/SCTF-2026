@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: web-shop-backend
+Version: 0.1.0
+Summary: Web Shop challenge backend
+Requires-Python: <3.12,>=3.11
+Requires-Dist: fastapi==0.115.6
+Requires-Dist: uvicorn[standard]==0.34.0
+Requires-Dist: pydantic==2.10.4
+Requires-Dist: langchain==0.3.27
+Requires-Dist: langchain-core==0.3.80
