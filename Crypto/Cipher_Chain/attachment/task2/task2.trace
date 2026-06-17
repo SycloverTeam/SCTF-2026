@@ -1,0 +1,9 @@
+curve_link trace
+
+role = client
+peer_key_len = 32
+secret_stage = compress(seed)
+burn_counter = 0xc350
+exchange = montgomery25519
+check = 32d39782e415b6b2
+payload_mode = stream-mask
