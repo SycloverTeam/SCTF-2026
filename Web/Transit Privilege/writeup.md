@@ -1,33 +1,4 @@
-# Transit Privilege 官方题解
-
-## 题目整体思路
-
-这题前半段是黑盒，后半段才转成白盒。
-
-选手一开始拿到的不是服务端源码，而是一个客户端附件 `edge-agent-client-0.1.0.jar`。这个附件把 `/proxy` 这一层通信协议暴露了出来，所以起手重点不是去猜后台接口，而是先把客户端协议吃透。  
-
-整个利用链可以概括成下面几步：
-
-1. 从附件里恢复 `/proxy` WebSocket 协议和签名方式；
-2. 通过 `cap.sync` 创建一个可以登录后台的 `OPERATOR` 用户；
-3. 登录后台后，顺着 workspace 这一套流程，把自己提到 `ADMIN`；
-4. 拿管理员权限访问 backup 功能，下载服务端 jar；
-5. 从服务端源码里确认 maintenance import 的反序列化链和最后的文件读取问题；
-6. 构造 payload，读出 `/flag`。
-
-这题真正考的是几段能力的串联，不是哪一个点单独有多深。
-
----
-
-## 一、黑盒阶段：先确认题目真正的入口
-
-题目网页表面上只是一个普通登录页。最先能看到的接口信息很少，像：
-
-- `/login`
-- `/admin/me`
-- `/api/status`
-
-访问 `/api/status`，返回内容比较普通：
+这题刚拿到的时候，网页表面上其实没什么好看的，就是一个普通登录页。能摸到的接口也很少，像 `/login`、`/admin/me`、`/api/status` 这种，`/api/status` 回的东西也很普通：
 
 ```json
 {
@@ -38,49 +9,15 @@
 }
 ```
 
-单靠这里很难直接往下打。  
-
-真正有价值的是附件 jar。反编译后很快能看出来，这个客户端不是去访问普通的 REST 接口，而是会把目标地址转成：
-
-```text
-ws://host/proxy
-```
-
-也就是说，第一段真正的通信入口是：
-
-```text
-/proxy
-```
-
-从客户端逻辑里还能顺着看到它的大致流程：
-
-```text
-HELLO -> AUTH -> DESCRIBE -> CALL
-```
-
-同时，签名所需的固定材料也都在客户端里，尤其是那串硬编码的 key：
+附件里是一个 `edge-agent-client-0.1.0.jar`，反编译以后很快能看出来，这东西不是在调普通的后台接口，而是会把目标地址转成 `ws://host/proxy`。再顺着客户端逻辑往下看，整个流程也比较清楚，就是 `HELLO -> AUTH -> DESCRIBE -> CALL` 这一套。签名材料也都在 jar 里写死了，包括那串固定 key：
 
 ```text
 6Ziy5ZCb5a2Q5LiN5aao5bCP5Lq6ISEh
 ```
 
-以及 `AUTH`、`CALL` 的拼接格式和 HMAC 计算方式。
+以及 `AUTH`、`CALL` 的拼接规则和 HMAC 算法。到这里其实就已经能判断，题目第一段真正要打的不是网页，而是 `/proxy` 这层协议。
 
----
-
-## 二、为什么会盯上 `cap.sync`
-
-把 `HELLO` 和 `AUTH` 跑通以后，再去看 `DESCRIBE` 返回的能力列表。  
-
-这里最值得注意的是 `cap.sync`。原因很简单：它不是普通的一次性调用，而是一个明显的协商流程。通常这种接口的副作用都不会小，要么是在做初始化，要么是在做身份绑定。
-
-当时并不是只凭字段名下判断，而是先拿远程服务做了几轮测试。`cap.sync` 这边有三个比较醒目的字段：
-
-- `identity`
-- `principal`
-- `secret`
-
-一开始只看名字，其实还不够。但继续发包会发现，`secret` 这个字段不是随便传都收。故意传一个太短或者过弱的值时，服务端会直接在回包里把密码规则打出来，例如：
+把 `HELLO` 和 `AUTH` 跑通以后，再去看 `DESCRIBE` 返回的能力范围，会有一个点很扎眼，就是 `cap.sync`。它不是那种普通的一次性调用，而是明显带协商过程的，后面还有 ticket 和 proof，这种接口一般副作用都不会太小。当时也不是一眼就认定它能建用户，而是先拿它本身做了一轮边界测试。它这边有三个比较显眼的字段：`identity`、`principal`、`secret`。光看名字其实还不够，但继续发包会发现 `secret` 不是随便传都收。故意传一个弱一点的值，服务端会直接回这种东西：
 
 ```json
 {
@@ -92,21 +29,15 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-看到这种报错，基本就能判断：`secret` 在这里更像是口令，而不是普通配置项。再结合 `principal` 这个字段名，思路自然就会往“创建用户”或者“绑定一组可登录凭据”上走。
+看到这个报错，其实就差不多了。因为这已经不是普通配置字段的检查方式，更像是在按密码处理。再结合 `principal` 这个名字，思路自然就会往“创建用户”或者“绑定一组登录凭据”上走。
 
----
-
-## 三、走通 `cap.sync`，拿到后台账号
-
-### 1. HELLO
-
-建立 WebSocket 到 `/proxy`，先发：
+实际走这个流程时，先连 `/proxy` 发一个：
 
 ```json
 {"type":"HELLO"}
 ```
 
-服务端返回：
+服务端会回：
 
 ```json
 {
@@ -119,29 +50,7 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-这里后面要用到的是：
-
-- `nonce`
-- `profile`
-- `routeEpoch`
-
-### 2. AUTH
-
-按客户端里的规则，用 `source=Transit` 做签名后发 `AUTH`。成功回包大致是：
-
-```json
-{
-  "ok": true,
-  "type": "AUTH_ACK",
-  "source": "Transit"
-}
-```
-
-说明这条会话已经进入可调用状态。
-
-### 3. DESCRIBE
-
-接着发：
+这里后面要用到的是 `nonce`、`profile`、`routeEpoch`。然后按 jar 里给的规则做 `AUTH`，成功以后再发：
 
 ```json
 {
@@ -151,7 +60,7 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-返回里能看到：
+回包里能看到：
 
 ```json
 {
@@ -167,9 +76,7 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-### 4. 第一阶段绑定
-
-先提交一组候选身份，例如：
+接着先给它一组候选身份，比如：
 
 ```json
 {
@@ -179,7 +86,7 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-服务端不会直接绑定成功，而是返回：
+服务端不会一步成功，而是回：
 
 ```json
 {
@@ -193,26 +100,7 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-这个回包已经把后面的方向说得很明白了：  
-
-- 当前流程没失败；
-- 服务端发了 `ticket`；
-- 还缺 `proof`；
-- 下一步要切到 `edge.capability.ticket` 继续。
-
-### 5. 第二阶段绑定
-
-再去看 `edge.capability.ticket` 这一层，服务端会把 proof 所需的上下文提示得比较完整。按客户端里的逻辑把 proof 算出来，再带着：
-
-- `identity`
-- `principal`
-- `secret`
-- `ticket`
-- `proof`
-
-发第二次 `cap.sync`。
-
-成功回包：
+这个回包基本已经把后面的方向说透了：当前流程没失败，服务端给了 `ticket`，接下来切到 `edge.capability.ticket` 继续补 `proof` 就行。后面再按客户端里的规则把 proof 算出来，带着 `identity`、`principal`、`secret`、`ticket`、`proof` 再发一次，成功回包大致是这样：
 
 ```json
 {
@@ -226,29 +114,21 @@ HELLO -> AUTH -> DESCRIBE -> CALL
 }
 ```
 
-真正关键的是：
+这里真正关键的是：
 
 ```json
 "scope": "operator-console"
 ```
 
-这就说明这组身份已经不是内部协商对象，而是被挂到了后台控制台这条身份域上。
+这说明这组身份已经不是内部协商对象，而是被挂到后台控制台这条身份域上了。拿这组 `principal/secret` 去登录网页，确实能进，而且角色是 `OPERATOR`。
 
-拿这组 `principal/secret` 去登录后台，可以验证这个判断。
-
----
-
-## 四、后台提权：顺着 workspace 继续走
-
-登录进去以后，不会直接看到很露骨的后台管理入口。  
-
-比较有价值的是：
+接下来这题不会直接把很明显的后台入口摆给你，真正有价值的是：
 
 ```text
 GET /api/workspace/bootstrap
 ```
 
-这个接口会返回一组当前会话可用的 actionId，例如：
+它会返回一组当前会话可用的 actionId，例如：
 
 ```json
 {
@@ -261,17 +141,13 @@ GET /api/workspace/bootstrap
 }
 ```
 
-这一步很关键，因为它说明前端真正用的是一套 facade：
+这一步挺关键，因为它说明前端真正用的是一层 facade：
 
 ```text
 POST /api/workspace/action
 ```
 
-所以后面应该顺着这一套工作流去试，而不是回头乱猜其他旧接口。
-
-### 1. draft
-
-先发起一个 draft。第一次回包不是直接完成，而是：
+所以后面提权不该再去猜什么旧接口，而是顺着这套工作流走。先起一个 draft，第一次回包不是直接完成，而是：
 
 ```json
 {
@@ -281,11 +157,7 @@ POST /api/workspace/action
 }
 ```
 
-这就说明后续的 reviewer 或 lane 不是固定死的，还要继续走 routing。
-
-### 2. preview
-
-再做 preview，能拿到一组比较模糊但足够用的提示：
+这就说明 reviewer 或 lane 不是固定死的，还要继续经过 routing。再去做 preview，会拿到一组比较含蓄但足够用的提示：
 
 ```json
 {
@@ -300,18 +172,9 @@ POST /api/workspace/action
 }
 ```
 
-这时候虽然还看不到完整后台逻辑，但几个关键词已经够用了：
+虽然这里没把后台逻辑明牌出来，但几个关键词已经很够了，尤其是 `policyRef`、`routing`、`handoff`、`retained` 这些。做到这里时，比较自然的想法就是：既然 reviewer 是在这一步决出来的，那能不能把这个流程收回到自己身上。
 
-- `policyRef`
-- `routing`
-- `handoff`
-- `retained`
-
-这里的思路其实不复杂：既然 reviewer 是通过 routing 决出来的，那就试试看能不能把这一步回收给自己。
-
-### 3. submit
-
-真正起作用的是这样一组 routing 元数据：
+真正能起作用的是这样一组 routing 元数据：
 
 ```json
 {
@@ -324,13 +187,7 @@ POST /api/workspace/action
 }
 ```
 
-提交之后，队列里能看到一条新记录，lane 会落到 `retain`。
-
-### 4. advance
-
-最后再用 `advanceActionId` 去推进它，把状态推到 `APPROVED`。  
-
-推进成功以后，再看：
+提交以后，队列里会出现一条新记录，lane 落到 `retain`。再用 `advanceActionId` 去推进它，把状态推成 `APPROVED`，然后再看：
 
 ```text
 GET /admin/me
@@ -345,23 +202,15 @@ GET /admin/me
 }
 ```
 
-也就是说，这一步确实完成了自提权。
+也就是说，前半段到这里已经跑通了，后面的目标就是找最后的读旗点。
 
----
-
-## 五、为什么拿到 ADMIN 后要先看 backup
-
-到了这里，前半段的目标已经完成，剩下的是找最后的读旗点。  
-
-这时候最自然的思路不是继续无头苍蝇一样扫接口，而是看后台有没有把更多实现信息暴露出来。这个题恰好把“黑盒转白盒”的入口放在 backup 功能里。
-
-访问：
+拿到管理员以后，这题最值钱的地方不是继续盲扫，而是先看后台有没有把更多实现信息自己暴露出来。这个题的“黑盒转白盒”入口就在 backup 功能里。访问：
 
 ```text
 GET /api/backup/list
 ```
 
-可以看到一条很有价值的记录：
+能看到一条很有价值的记录：
 
 ```json
 [
@@ -374,81 +223,53 @@ GET /api/backup/list
 ]
 ```
 
-这条说明已经非常直接了：  
-
-- profile 是 `server-source`
-- note 里明确说了里面是 packaged service jar
-
-接下来走：
-
-```text
-POST /api/backup/create
-GET /api/backup/fetch
-```
-
-可以拿到 `server-source.zip`。  
-
-这个压缩包里只有一个服务端 jar：
+这条已经说得很直白了：profile 是 `server-source`，note 里也明确写了里面是 packaged service jar。继续走 `create` 和 `fetch`，能拿到 `server-source.zip`。这个包里只有一个服务端 jar：
 
 ```text
 ops-console-demo-0.1.0.jar
 ```
 
-从这一步开始，题目才正式进入后半段源码分析。
+从这一步开始，题目后半段才正式转成源码分析。
 
----
-
-## 六、拿到源码后，定位最终链
-
-拿到服务端 jar 以后，后半段就清楚很多了。  
-
-最值得先看的几个关键词是：
-
-- `reconcile`
-- `ObjectInputStream`
-- `readObject`
-
-很快能定位到：
+拿到这个 jar 以后，先搜几个最自然的关键词，比如 `reconcile`、`ObjectInputStream`、`readObject`，很快就能定位到：
 
 ```text
 /admin/maintenance/reconcile
 ```
 
-这里会接收一个 Base64 的 zip，解包后找：
-
-- `manifest.json`
-- `inventory.dat`
-
-然后对 `inventory.dat` 做原生 Java 反序列化。
-
-顺着往下看，最关键的类是：
+这里会接收一个 Base64 的 zip，解包后找 `manifest.json` 和 `inventory.dat`，然后对 `inventory.dat` 做原生 Java 反序列化。顺着这条链往下看，最关键的类是：
 
 ```text
 ctf.sctf.ops.maintenance.InventoryCursorEntry
 ```
 
-它的 `readObject()` 在反序列化时会直接继续调用：
+这个类的 `readObject()` 在反序列化时会直接继续调用：
 
 ```text
 ProbeSandbox.renderSnapshot(name, profile, cursor)
 ```
 
-同时，这一步的输出还会被写进 maintenance report。  
+而且这一步的输出还会被写进 maintenance report。也就是说，这里同时具备两件事：一是对象一旦被反序列化就能进逻辑，二是结果最后还能从 report 里读回来，所以它自然就成了后半段最合适的入口。
 
-这就同时满足了两件事：
+继续看 `ops-console-demo-0.1.0.jar` 里的 `ctf.sctf.ops.maintenance.ProbeSandbox`，后半段真正的问题也就清楚了。`InventoryCursorEntry.readObject()` 把 `cursor` 和 `profile` 传进来以后，`renderSnapshot()` 在 `profile=merge` 时会走到这样一条链：
 
-1. 反序列化时能触发逻辑；
-2. 结果还能从 report 里拿回来。
+```text
+BridgeIndexRenderer.renderProfile(...)
+-> LegacyCursorAdapter.flattenToken(cursor)
+-> IndexSnapshotStore.readSegment(storageToken)
+```
 
-所以它就是后半段最合适的入口。
+问题就出在 `LegacyCursorAdapter.flattenToken()`。这个方法不是直接拿原始 `cursor` 去读文件，而是先遍历字符串里的每个字符，然后调用：
 
----
+```java
+private static byte bridgeOctet(char codeUnit) {
+    return (byte) codeUnit;
+}
+```
 
-## 七、真正的问题出在“检查的字符串”和“实际用的字符串”不是一回事
+也就是说，每个 Java `char` 在这里都会被强制截成一个 `byte`，只保留低 8 位。随后 `flattenToken()` 再用 `ISO_8859_1` 把这些字节重新拼回字符串。到这里，前面过滤逻辑看到的“可见字符串”和后面真正参与路径解析的“物化字符串”就已经不是同一个东西了。
 
-继续看 `ProbeSandbox`，会发现 `profile=merge` 这条分支最终会把 `cursor` 带进文件读取链。  
-
-单看过滤逻辑，好像是在拦路径穿越，比如会检查：
+再回头看过滤逻辑，它表面上是在拦路径穿越，比如会检查：
 
 - `../`
 - `./`
@@ -456,72 +277,48 @@ ProbeSandbox.renderSnapshot(name, profile, cursor)
 - `..%2f`
 - `%u002e`
 
-但关键问题不是“有没有黑名单”，而是它检查的是**可见字符串**，后面真正参与路径解析的却是另一个被重新物化过的值。
+但它检查的是原始可见字符串。如果某些 Unicode 字符本身看起来不是 `.`、`/`，但它们的低 8 位刚好等于 `.`、`/`，那前面检查能过，后面 `flattenToken()` 物化出来的却会是真正的路径字符。
 
-中间有一步很关键的转换，大意就是把每个 Java `char` 强制截成一个 `byte`。  
+这题里就是这么做的。比如：
 
-这就带来一个后果：
-
-- 过滤时看见的字符，不一定是最后参与拼路径的字符；
-- 只要某个 Unicode 字符的低 8 位刚好等于目标 ASCII 值，后面就会被还原成真正的 `.`、`/` 之类的字符。
-
-比如：
-
-- `售` 的低 8 位是 `0x2e`，最后会变成 `.`
-- `启` 的低 8 位是 `0x2f`，最后会变成 `/`
+- `售` 的低 8 位会变成 `.`
+- `启` 的低 8 位会变成 `/`
 - `书`、`公`、`卡`、`剧` 的低字节分别能对应 `f`、`l`、`a`、`g`
 
-所以看起来像普通汉字的一串内容：
+所以表面上看是一串正常汉字：
 
 ```text
 售售启售售启售售启书公卡剧
 ```
 
-最后会被物化成：
+但经过 `LegacyCursorAdapter.flattenToken()` 以后，会被物化成：
 
 ```text
 ../../../flag
 ```
 
-再结合 report 目录去做 `resolve().normalize()`，最终就能走到：
+后面再结合 report 根目录去做 `resolve().normalize()`，最终就会落到：
 
 ```text
 /flag
 ```
 
----
-
-## 八、最后一步：把读取结果从 report 拿回来
-
-构造好 `InventoryCursorEntry` 对象以后，把它放进导入 zip 的 `inventory.dat`，再配一份合法的 `manifest.json`，整体 Base64 后提交到：
+剩下的事情就比较直接了。把构造好的 `InventoryCursorEntry` 放进导入 zip 的 `inventory.dat`，再配一份合法的 `manifest.json`，整体 Base64 后提交到：
 
 ```text
 POST /admin/maintenance/reconcile
 ```
 
-服务端返回一个 `importId`，然后去访问：
+服务端会返回一个 `importId`，然后去访问：
 
 ```text
 GET /admin/maintenance/reports?importId=<importId>
 ```
 
-就能在 report 中看到最终输出。  
-
-实际拿到的 flag 是：
+最终就能在 report 里看到结果。实际拿到的 flag 是：
 
 ```text
 SCTF{Tr4ns1t_Pr0b3_4107_M@sTer}
 ```
 
----
-
-## 总结
-
-这题真正有意思的地方，在于几段能力都是“半露不露”的：
-
-- 前半段不是直接给后台接口，而是给了一个看起来像边缘客户端的 jar；
-- 提权也不是明牌的管理审批，而是藏在 workspace 这套 facade 里；
-- 后半段不是一上来就把源码给选手，而是要求先拿管理员，再自己从 backup 里把服务端 jar 取出来；
-- 最终读旗点也不是直白的路径穿越，而是落在一次表示层不一致上。
-
-如果只拆开看单个点，这题都不算特别复杂；真正的难点在于要把整条链自己接起来。
+这题如果回头看，单个点其实都不算特别离谱。真正麻烦的是它把这些东西拆开藏在不同层里：前半段用客户端 jar 把协议露出来，后台提权埋在 workspace 这种不太起眼的 facade 里，源码又不是一开始就给，而是得自己拿管理员后从 backup 里取，最后的读旗点也不是直白的 `../`，而是落在了一次表示层不一致上。顺着这个思路往下走，整条链会比较顺；如果一开始方向偏了，确实会多花不少时间。
