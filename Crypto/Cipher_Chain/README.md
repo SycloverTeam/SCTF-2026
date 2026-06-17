@@ -22,3 +22,7 @@
 * exptask2.go
 * go.mod
 * go.sum
+
+# sourcecode
+* get_task1_txt.py
+* task2.go
