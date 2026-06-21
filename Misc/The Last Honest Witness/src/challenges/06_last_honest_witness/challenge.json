@@ -1,0 +1,19 @@
+{
+  "id": "06_last_honest_witness",
+  "name": "The Last Honest Witness",
+  "category": "Misc",
+  "difficulty": "Hard",
+  "points": 500,
+  "description": "A committee encrypted one anonymous witness testimony and split the reward across three fragment vaults. Recover the hidden testimony, prove Merkle membership, solve the extra cryptographic fragments, and drain the 100 ETH reward.",
+  "hints": [
+    "The deployment remembers more than the source code says.",
+    "The two guardians of the modulus were born almost at the same time.",
+    "Two nearby statements may share more than they should.",
+    "A public key can be too small in the place that matters.",
+    "Sometimes only the last few bytes of a seal are inspected.",
+    "The witness does not reveal a name, only a commitment.",
+    "The tree accepts only one active voice among many empty seats.",
+    "Three locks listen to three different kinds of proof."
+  ],
+  "setup_value_eth": 100
+}

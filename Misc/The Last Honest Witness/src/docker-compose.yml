@@ -1,0 +1,24 @@
+services:
+  ctf-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      # nc challenge server
+      - "1337:1337"
+      # Filtered player RPC proxies (one port per player instance)
+      - "20000-20200:20000-20200"
+    environment:
+      - PORT=1337
+      # Set PUBLIC_HOST to your server's public IP or hostname for remote access.
+      # Leave as 127.0.0.1 for local testing.
+      - PUBLIC_HOST=${PUBLIC_HOST:-127.0.0.1}
+      - CTF_API_URL=${CTF_API_URL:-}
+      - INSTANCE_TIMEOUT=${INSTANCE_TIMEOUT:-1800}
+      - ANVIL_PORT_MIN=20000
+      - ANVIL_PORT_MAX=20200
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
