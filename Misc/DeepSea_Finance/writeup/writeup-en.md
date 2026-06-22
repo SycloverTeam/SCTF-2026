@@ -145,8 +145,8 @@ Under solc 0.8.29 + `via_ir` mode, `delete` on a transient variable has a compil
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import "../DeepSea Finance/src/Setup.sol";
-import "../DeepSea Finance/src/vault/DeepSeaVault.sol";
+import "../src/src/Setup.sol";
+import "../src/src/vault/DeepSeaVault.sol";
 
 contract Exploit {
     constructor(Setup setup, address player) {

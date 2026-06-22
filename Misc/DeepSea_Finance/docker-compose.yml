@@ -1,0 +1,19 @@
+services:
+  ctf-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "5000:1337"
+      - "5001-5050:5001-5050"
+    environment:
+      - PORT=1337
+      - PUBLIC_HOST=1.95.63.227
+      - INSTANCE_TIMEOUT=1800
+      - ANVIL_PORT_MIN=5001
+      - ANVIL_PORT_MAX=5050
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
