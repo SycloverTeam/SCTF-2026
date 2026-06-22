@@ -1,0 +1,29 @@
+# 题解/利用脚本 — 绝对不能进镜像
+exp/
+writeup/
+docs/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 文档（选手不应该看到协议细节）
+README.md
+src/README*.md
+
+# Git
+.git/
+.gitignore
+
+# Docker 导出产物
+*.tar.gz
+
+# IDE / 编辑
+.vscode/
+.idea/
+
+# 题解 solidity 文件（如果存在）
+src/test/
+src/script/
+challenges/*/test/
+challenges/*/script/

@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  ctf-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      # nc challenge server
+      - "7000:7000"
+      # Anvil RPC instances (one port per player instance)
+      - "7001-7050:7001-7050"
+    environment:
+      - PORT=7000
+      - PUBLIC_HOST=${PUBLIC_HOST:-127.0.0.1}
+      - FLAG_SECRET=${FLAG_SECRET:-SCTF{w0r!d.3xecut3(3th3r_!p_str1k3);}}
+      - INSTANCE_TIMEOUT=${INSTANCE_TIMEOUT:-1800}
+      - MAX_INSTANCES_PER_TEAM=${MAX_INSTANCES_PER_TEAM:-0}  # 0 = unlimited
+      - ANVIL_PORT_MIN=7001
+      - ANVIL_PORT_MAX=7050
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
