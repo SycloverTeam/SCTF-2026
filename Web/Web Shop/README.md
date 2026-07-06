@@ -1,71 +1,62 @@
-# Web Shop
+## 标题
+Web Shop
 
-XCTF/SCTF Web challenge service.
+### 作者
+ivory
 
-## Stack
+### 方向
+Web
 
-- Backend: Python 3.11 + FastAPI
-- Frontend: Vite + React + TypeScript
-- Database: SQLite
-- Key dependency: `langchain-core==0.3.80`
+### 知识点
 
-## Challenge chain
+>题目涉及的知识点
 
-```text
-chat metadata context restore
-  -> leak SHOP_SUPPORT_SEED
-  -> derive staff-code with HMAC
-  -> Bot /login privilege escalation
-  -> Rule Lab pricing-rule sandbox
-  -> generator frame based rule-context escape
-  -> read /app/private/flag.txt
-```
+- LangChain metadata 反序列化
+- 环境变量 secret 泄露
+- HMAC 票据伪造
+- Python 沙箱逃逸
+- `str.format` 字段访问绕过静态检测
+- 生成器 frame locals 读取
 
-## Local backend
+### 难度
 
-```powershell
-cd backend
-pip install -e .
-$env:FLAG='SCTF{local_flag}'
-$env:SHOP_SUPPORT_SEED='local-support-seed'
-$env:FLAG_PATH="$PWD\..\temp\flag.txt"
-$env:DATA_DIR="$PWD\..\data"
-uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
+>分为：初级、中级、高级
 
-## Local frontend
+高级
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
+### 内容
 
-Visit:
+>对题目进行一个简单的描述
 
-```text
-http://127.0.0.1:5173
-```
+一个在线 Web Shop。选手需要通过商店、聊天区和客服 Bot 逐步获取后台权限，最终利用规则测试台中的 Python 沙箱缺陷读取发货预览中的 flag。
 
-## Docker
+### 提示
 
-```powershell
-docker build -t web-shop .
-docker run --rm -p 8080:8080 `
-  -e FLAG='SCTF{placeholder}' `
-  -e SHOP_SUPPORT_SEED='local-support-seed' `
-  web-shop
-```
+>为选手提供的提示，尤其是难题，需要准备1-2个提示
 
-Visit:
+- 商店里可下载的客服调试脚本说明了客服登录票据的签发方式。
+- 聊天 metadata 的恢复逻辑与 LangChain 序列化对象有关。
 
-```text
-http://127.0.0.1:8080
-```
+### FLAG
 
-## Notes
+>每个步骤一个flag，动态flag留白即可，系统根据pushflag脚本自动判断即可
 
-- `FLAG` is written to `FLAG_PATH` on startup and then removed from `os.environ`.
-- Default Docker `FLAG_PATH` is `/app/private/flag.txt`.
-- `SHOP_SUPPORT_SEED` remains in the runtime environment for staff-code derivation.
-- The container runs as non-root user `webshop`.
+分步模式
+
+- 动态 flag，由平台通过 `script/pushflag.sh` 写入 `/flag`
+
+随机模式（附件题防作弊专用）
+
+>这里对应防作弊模式里面，不同附件对应不同flag，所以这里需要填上attachments文件夹里附件的名称，例如easyreverse1.zip
+
+无
+
+### 是否可共享
+
+是
+
+###  备注
+
+>选手最终得到的是flag{}之间的字符串，提交需加上flag{}
+
+环境题，无选手附件。服务监听容器内 8080 端口，部署文件位于 `env/`，源码归档位于 `sourcecode/sourcecode.zip`，攻击脚本位于 `exp/exp.py`，题解位于 `writeup/writeup.md`。

