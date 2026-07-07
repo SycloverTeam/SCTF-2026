@@ -1,19 +1,47 @@
-# Cuneiform
+## 标题
 
-**SCTF 2026 · Crypto · 静态附件**
+Cuneiform
 
-## 题目简介
+### 作者
 
-四块出土于第三王朝档案馆的刻字泥板，每块编码了一个定义在
-51 杆平衡三进制算盘上的二次计分规则。一份密封卷轴仅能通过恢复
-唯一满足目标读数的配置来开启。
+komiko
 
-## 附件
+### 方向
 
-- `chall.py` 
-- `output.txt` 
+crypto
 
-# exp
+### 知识点
 
-* exp.sage
+- UOV (Unbalanced Oil and Vinegar) 签名方案
+- 有限域 GF(3⁵¹) 上的二次型与极形式
+- 隐藏子空间恢复（Beullens 交集攻击）
+- Gröbner 基求解多元多项式方程组
+- Plücker 坐标与基无关不变量
+
+### 难度
+
+初级
+
+### 内容
+
+恢复隐藏子空间 *V*，并利用目标向量和 Plücker 不变量构造封印密钥，最终异或解出 flag
+
+### 提示
+
+* Beullens 交集攻击
+
+### FLAG
+
+`SCTF{d71b0c45-d382-42dc-ba68-5780ae1f6e6a}`
+
+### 是否可共享
+
+是
+
+###  备注
+
+- `chall.py`
+- `output.txt`
+
+- exp.sage
 
