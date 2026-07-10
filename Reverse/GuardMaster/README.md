@@ -5,7 +5,7 @@ dancing_rabbit
 Samsāra
 
 ### 方向
-Misc
+Reverse
 
 ### 难度
 
