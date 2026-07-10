@@ -1,3 +1,9 @@
+---
+noteId: "17f2a7207c3711f19edf53c6950af6aa"
+tags: []
+
+---
+
 打开ida反编译，发现整体为
 
 ```text
