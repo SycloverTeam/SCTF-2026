@@ -1,7 +1,0 @@
-services:
-  challenge:
-    build:
-      context: .
-    restart: unless-stopped
-    ports:
-      - "5000:8080"
