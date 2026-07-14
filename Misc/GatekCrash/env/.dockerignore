@@ -1,0 +1,3 @@
+# Exclude Foundry build artifacts (compiled on host OS with wrong path separators)
+out/
+cache/

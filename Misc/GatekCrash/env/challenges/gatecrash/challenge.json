@@ -1,0 +1,14 @@
+{
+  "id": "gatecrash",
+  "name": "GateCrash",
+  "category": "Blockchain",
+  "difficulty": "Medium",
+  "flag_type": "static",
+  "description_zh": "GateCrash 是一个基于 ERC-4337 的账户抽象智能合约。",
+    "description_en": "GateCrash is an ERC-4337 account abstraction smart contract.",
+  "hints": [
+    "Solidity's storage layout optimizer packs owner, validationModuleFlag, and validationModule into the same slot.",
+    "delegatecall runs external code in the caller's storage context -- what happens if the module writes to slot 0?"
+  ],
+  "setup_value_eth": 10
+}

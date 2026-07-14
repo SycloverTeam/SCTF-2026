@@ -1,0 +1,23 @@
+version: "3.9"
+
+# GateCrash — Static Flag / Per-Player Isolated Instances
+#
+# Each player gets a dedicated Anvil + Setup deployment.
+# Static flag injected via:
+#   docker compose exec gatecrash /app/script/pushflag.sh "SCTF{...}"
+
+services:
+  gatecrash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "1337:1337"              # TCP server (nc interface)
+      - "40000-40100:40000-40100" # Per-player Anvil RPC proxies
+    environment:
+      - PORT=1337
+      - ANVIL_PORT_MIN=40000
+      - ANVIL_PORT_MAX=40100
+      - PUBLIC_HOST=127.0.0.1
+      - INSTANCE_TIMEOUT=1800
+    restart: unless-stopped
